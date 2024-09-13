@@ -2,7 +2,7 @@ from mpi4py import MPI
 import jax
 import jax.numpy as jnp
 import jax.lax as lax
-import jax.experimental.mpi as jmpi
+#import jax.experimental.mpi as jmpi
 
 from constants import *
 
@@ -42,12 +42,19 @@ def all_reduce(x, comm):
         jax.numpy.ndarray: The result of the all-reduce operation.
     """
     # Perform the all-reduce operation
-    return comm.allreduce(x, op=lax.psum)
+    # Define the axis name
+    axis_name = 'i'
+    # Perform the all-reduce operation
+    return comm.allreduce(x, jax.pmap(lambda x, _: lax.psum(x, axis_name), axis_name=axis_name))
+    #return comm.allreduce(x, jax.pmap(lambda x: lax.psum(x, axis_name), axis_name=axis_name))
+    #return comm.allreduce(x, op=lax.psum)
+    #return result
 
 
 def run_all_reduce(comm, dtype, maxsize, mem_factor, scan=True):
     world_size = get_world_size(comm)
     global_rank = get_rank(comm)
+    local_rank = get_rank(comm)
 
     # JAX does not have CUDA events, so we will use a simple timer for timing
     start_time = None
@@ -63,7 +70,7 @@ def run_all_reduce(comm, dtype, maxsize, mem_factor, scan=True):
         for M in M_LIST:
             global_rank = get_rank(comm)
             try:
-                mat = jnp.ones((world_size, M), dtype=getattr(jnp, dtype))
+                mat = jnp.ones((world_size, M), dtype=dtype)
                 #sync_all()
                 x = ((mat * float(global_rank)).reshape(-1))
                 del mat
@@ -77,16 +84,16 @@ def run_all_reduce(comm, dtype, maxsize, mem_factor, scan=True):
                 else:
                     raise e
             #sync_all()
-            timed_all_reduce(x, comms, start_time, end_time)
+            timed_all_reduce(x, comm, start_time, end_time)
     else:
         # Send the biggest message size our GPUs can fit. If you're facing OOM errors, reduce the mem_factor
-        # Don't need output tensor, so we double mem_factor
-        elements_per_gpu = max_numel(dtype=getattr(jnp, dtype),
+        # Don't need output tensor, so we double,mem_factor
+        elements_per_gpu = max_numel(dtype=dtype,
                                      mem_factor=mem_factor * 2,
                                      local_rank=local_rank)
 
         try:
-            mat = jnp.ones(elements_per_gpu, dtype=getattr(jnp, dtype))
+            mat = jnp.ones(elements_per_gpu, dtype=dtype)
             x = ((mat * float(global_rank)).reshape(-1))
             jax.device_put(x, jax.devices()[local_rank])
         except RuntimeError as e:
@@ -98,14 +105,15 @@ def run_all_reduce(comm, dtype, maxsize, mem_factor, scan=True):
             else:
                 raise e
         #sync_all()
-        timed_all_reduce(x, comms, start_time, end_time)
+        timed_all_reduce(x, comm, start_time, end_time)
 
-def timed_all_reduce(x, comms, start_time, end_time):
+def timed_all_reduce(x, comm, start_time, end_time):
+    import time
     if start_time is None:
-        start_time = jax.default_backend().timer()
-    all_reduce(x, comms)
+        start_time = time.time()
+    all_reduce(x, comm)
     if end_time is None:
-        end_time = jax.default_backend().timer()
+        end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"All-reduce time: {elapsed_time:.6f} seconds")
 
