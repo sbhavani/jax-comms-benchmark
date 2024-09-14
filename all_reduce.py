@@ -92,7 +92,7 @@ def timed_all_reduce(x, comm, start_time, end_time, warmups=10, trials=10):
     element_size = x.dtype.itemsize
     size = element_size * x.size
     n = get_world_size(comm)
-    tput, busbw = get_bw('all_reduce', size, avg_duration, comm)
+    tput, busbw = get_bw(comm, 'all_reduce', size, avg_duration)
     tput_str, busbw_str, duration_str = get_metric_strings(tput, busbw, avg_duration)
     desc = f'{x.size}x{x.size}'
 
