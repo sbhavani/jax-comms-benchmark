@@ -1,7 +1,7 @@
 # jax-comms-benchmark
 Benchmarking collective communication operations in JAX
 
-## Example
+# Example
 `mpirun -np 4 python all_reduce.py`
 
 ---- Performance of all_reduce on 4 devices ---------------------------------------------------------
@@ -30,3 +30,7 @@ Benchmarking collective communication operations in JAX
 | 16.0 MB | 8388608x8388608 | 225.367 ms | 1.191 | 0.893 |
 | 32.0 MB | 16777216x16777216 | 569.948 ms | 0.942 | 0.706 |
 | 64.0 MB | 33554432x33554432 | 1132.699 ms | 0.948 | 0.711 |
+
+# References
+* https://github.com/stas00/ml-engineering/tree/master/network/benchmarks
+* https://github.com/NVIDIA/JAX-Toolbox/blob/main/.github/container/jax-nccl-test
