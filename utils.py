@@ -30,10 +30,10 @@ def print_header(comm, comm_op, world_size=2, bw_unit=DEFAULT_UNIT, raw=False):
         duration_str += ' (us)'
     header += f"{'Size (Bytes)':20s} {'Description':25s} {duration_str:20s} {tput:20s} {busbw:20s}\n"
     header += "----------------------------------------------------------------------------------------------------"
-    print_rank_0(header)
+    print_rank_0(comm, header)
 
 
-def get_bw(comm, comm_op, size, avg_duration, bw_unit=DEFAULT_UNIT):
+def get_bw(comm, comm_op, size, duration, bw_unit=DEFAULT_UNIT):
     n = get_world_size(comm)
     tput = 0
     busbw = 0
@@ -51,7 +51,7 @@ def get_bw(comm, comm_op, size, avg_duration, bw_unit=DEFAULT_UNIT):
         tput = (size / duration)
         busbw = tput
     else:
-        print_rank_0("wrong comm_op specified")
+        print_rank_0(comm, "wrong comm_op specified")
         exit(0)
 
     if bw_unit == 'Gbps':
@@ -68,7 +68,7 @@ def get_metric_strings(tput, busbw, duration, raw=False):
 
     if duration_us < 1e3 or raw:
         duration = f'{duration_us:.3f}'
-        if not args.raw:
+        if not raw:
             duration += ' us'
     else:
         duration = f'{duration_ms:.3f} ms'
