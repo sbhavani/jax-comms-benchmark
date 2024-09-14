@@ -1,6 +1,7 @@
 from mpi4py import MPI
 import jax
 import jax.numpy as jnp
+import numpy as np
 import jax.lax as lax
 import time
 #import jax.experimental.mpi as jmpi
@@ -92,18 +93,33 @@ def run_all_reduce(comm, dtype, maxsize, mem_factor, scan=True):
 
         timed_all_reduce(x, comm, start_time, end_time)
 
-def timed_all_reduce(x, comm, start_time, end_time):
+def timed_all_reduce(x, comm, start_time, end_time, warmups=10, trials=10):
     for i in range(warmups):
         all_reduce(x, comm)
 
     if start_time is None:
         start_time = time.time()
-    all_reduce(x, comm)
+    for j in range(trials):
+        all_reduce(x, comm)
     if end_time is None:
         end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f"All-reduce time: {elapsed_time:.6f} seconds")
+    duration = end_time - start_time
+    #print(f"All-reduce time: {elapsed_time:.6f} seconds")
 
+    # maintain and clean performance data
+    avg_duration = duration / trials
+    # JAX arrays don't ahve element_size()
+    x_np = np.array(x)
+    element_size = x.dtype.itemsize
+    size = element_size * x.size
+    n = get_world_size(comm)
+    #tput, busbw = get_bw('all_reduce', size, avg_duration)
+    #tput_str, busbw_str, duration_str = get_metric_strings(args, tput, busbw, avg_duration)
+    desc = f'{x.size}x{x.size}'
+
+    #size = convert_size(size)
+    print(f"{size:<20} {desc:25s} {avg_duration:20}")
+    #print_rank_0(f"{size:<20} {desc:25s} {duration_str:20s} {tput_str:20s} {busbw_str:20s}")
 
 def max_numel(dtype, mem_factor=0.8, local_rank=0):
     """
