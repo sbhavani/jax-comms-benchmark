@@ -4,33 +4,9 @@ import jax.numpy as jnp
 import numpy as np
 import jax.lax as lax
 import time
-#import jax.experimental.mpi as jmpi
 
 from constants import *
-
-def get_world_size(comm):
-    """
-    Get the number of processes in the communicator.
-
-    Args:
-        comm (jax.experimental.mpi.Communicator): The communication object for MPI operations.
-
-    Returns:
-        int: The number of processes.
-    """
-    return comm.size
-
-def get_rank(comm):
-    """
-    Get the rank of the current process in the communicator.
-
-    Args:
-        comm (jax.experimental.mpi.Communicator): The communication object for MPI operations.
-
-    Returns:
-        int: The rank of the current process.
-    """
-    return comm.rank
+from utils import *
 
 def all_reduce(x, comm):
     num_local_devices = jax.local_device_count()
@@ -44,6 +20,9 @@ def run_all_reduce(comm, dtype, maxsize, mem_factor, scan=True):
     world_size = get_world_size(comm)
     global_rank = get_rank(comm)
     local_rank = get_rank(comm)
+
+    # Prepare benchmark header
+    print_header(comm, 'all_reduce', world_size)
 
     # JAX does not have CUDA events, so we will use a simple timer for timing
     start_time = None
@@ -104,7 +83,7 @@ def timed_all_reduce(x, comm, start_time, end_time, warmups=10, trials=10):
     if end_time is None:
         end_time = time.time()
     duration = end_time - start_time
-    #print(f"All-reduce time: {elapsed_time:.6f} seconds")
+    #print(f"All-reduce time: {duration:.6f} seconds")
 
     # maintain and clean performance data
     avg_duration = duration / trials
@@ -113,13 +92,13 @@ def timed_all_reduce(x, comm, start_time, end_time, warmups=10, trials=10):
     element_size = x.dtype.itemsize
     size = element_size * x.size
     n = get_world_size(comm)
-    #tput, busbw = get_bw('all_reduce', size, avg_duration)
-    #tput_str, busbw_str, duration_str = get_metric_strings(args, tput, busbw, avg_duration)
+    tput, busbw = get_bw('all_reduce', size, avg_duration, comm)
+    tput_str, busbw_str, duration_str = get_metric_strings(tput, busbw, avg_duration)
     desc = f'{x.size}x{x.size}'
 
-    #size = convert_size(size)
-    print(f"{size:<20} {desc:25s} {avg_duration:20}")
-    #print_rank_0(f"{size:<20} {desc:25s} {duration_str:20s} {tput_str:20s} {busbw_str:20s}")
+    size = convert_size(size)
+    #print(f"{size:<20} {desc:25s} {avg_duration:20}")
+    print_rank_0(comm, f"{size:<20} {desc:25s} {duration_str:20s} {tput_str:20s} {busbw_str:20s}")
 
 def max_numel(dtype, mem_factor=0.8, local_rank=0):
     """
