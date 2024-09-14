@@ -2,6 +2,7 @@ from mpi4py import MPI
 import jax
 import jax.numpy as jnp
 import jax.lax as lax
+import time
 #import jax.experimental.mpi as jmpi
 
 from constants import *
@@ -31,24 +32,11 @@ def get_rank(comm):
     return comm.rank
 
 def all_reduce(x, comm):
-    """
-    Perform an all-reduce operation on the input tensor `x` using the provided communication object `comm`.
-
-    Args:
-        x (jax.numpy.ndarray): The input tensor to be reduced.
-        comm (jax.experimental.mpi.Communicator): The communication object for MPI operations.
-
-    Returns:
-        jax.numpy.ndarray: The result of the all-reduce operation.
-    """
-    # Perform the all-reduce operation
-    # Define the axis name
-    axis_name = 'i'
-    # Perform the all-reduce operation
-    return comm.allreduce(x, jax.pmap(lambda x, _: lax.psum(x, axis_name), axis_name=axis_name))
-    #return comm.allreduce(x, jax.pmap(lambda x: lax.psum(x, axis_name), axis_name=axis_name))
-    #return comm.allreduce(x, op=lax.psum)
-    #return result
+    num_local_devices = jax.local_device_count()
+    # Reshape x to have a leading axis size equal to the number of local devices
+    x = x.reshape((num_local_devices,) + x.shape)
+    # Perform the allreduce operation
+    return comm.allreduce(x, op=MPI.SUM)
 
 
 def run_all_reduce(comm, dtype, maxsize, mem_factor, scan=True):
@@ -79,11 +67,9 @@ def run_all_reduce(comm, dtype, maxsize, mem_factor, scan=True):
                 if 'out of memory' in str(e):
                     if get_rank(comm) == 0:
                         print('WARNING: Ran out of GPU memory. Exiting comm op.')
-                    #sync_all()
                     break
                 else:
                     raise e
-            #sync_all()
             timed_all_reduce(x, comm, start_time, end_time)
     else:
         # Send the biggest message size our GPUs can fit. If you're facing OOM errors, reduce the mem_factor
@@ -100,15 +86,16 @@ def run_all_reduce(comm, dtype, maxsize, mem_factor, scan=True):
             if 'out of memory' in str(e):
                 if get_rank(comm) == 0:
                     print('WARNING: Ran out of GPU memory. Try to reduce the --mem-factor argument!')
-                #sync_all()
                 return
             else:
                 raise e
-        #sync_all()
+
         timed_all_reduce(x, comm, start_time, end_time)
 
 def timed_all_reduce(x, comm, start_time, end_time):
-    import time
+    for i in range(warmups):
+        all_reduce(x, comm)
+
     if start_time is None:
         start_time = time.time()
     all_reduce(x, comm)
